@@ -1,7 +1,9 @@
+from asyncio import base_tasks
 from concurrent.futures import thread
 import time
 import queue
 import random
+from typing import Type
 import numpy as np
 from packet import Packet
 import threading
@@ -9,6 +11,7 @@ from host import Host
 import math
 from constants import *
 from concurrent.futures import ThreadPoolExecutor
+import sys
 
 # Switch queues, and a place to store the successfully delivered packets
 switches = [queue.Queue()] * 4
@@ -39,10 +42,10 @@ round robin sends packets from non empty buckets.
 def host_egress_controller(host: Host, end_time):
     while time.time() < end_time:
         for i in range(4):
-            if host.queues[i].empty():
+            if host.queue.empty():
                 continue
             
-            pkt = host.queues[i].get()
+            pkt = host.queue.get()
             
             if pkt:
                 switches[host.group].put(pkt)
@@ -252,14 +255,72 @@ def rate_limit_sim(epochs, traffic_dist, avg_pkt_per_epoch):
     print("**********************************************\n\n")
 
 
-            
+
+def value_parser(string, type: Type):
+    try:
+        val = type(string)
+    except ValueError:
+        print("ERROR: {} is not a {}".format(string, type))
+        return False
+    return val
+    
 
 
 if __name__ == "__main__":
-    # In a situation where we know the traffic distribution, we can get minimal interference
-    rate_limit_sim(100000, [6/12, 9/12, 11/12, 1.0], 5)
+    args = sys.argv
     
-    # In a situation where we do not know the traffic distribution, interference can be brutal
-    rate_limit_sim(100000, [0.25, 0.5, 0.75, 1.0], 5)
+    base_tdist = [6/12, 9/12, 11/12, 1.0]
     
-    run(10000000, [6/12, 9/12, 11/12, 1.0], 0.00001)
+    if len(args) == 1:
+        # In a situation where we know the traffic distribution, we can get minimal interference
+        rate_limit_sim(100000, base_tdist, 5)
+        
+        # In a situation where we do not know the traffic distribution, interference can be brutal
+        rate_limit_sim(100000, [0.25, 0.5, 0.75, 1.0], 5)
+        
+        run(10000000, base_tdist, 0.00001)
+    
+    else:
+        if args[1] == 'net_sim':
+            if len(args) == 2:
+                run(10000000, base_tdist, 0.00001)
+            
+            else:
+                if args[2] == '-d':
+                    epochs = value_parser(args[3], int)
+                    p_tx = value_parser(args[4], float)
+                    if epochs and p_tx:
+                        run(epochs, base_tdist, p_tx)
+                        
+                else:
+                    epochs = value_parser(args[2], int)
+                    d1 = value_parser(args[3], float)
+                    d2 = value_parser(args[4], float)
+                    d3 = value_parser(args[5], float)
+                    p_tx = value_parser(args[6], float)
+                    
+                    if epochs and p_tx and d1 and d2 and d3 and p_tx:
+                        run(epochs, [d1,d2,d3,1.0], p_tx)
+                        
+        elif args[1] == 'rate_sim':
+            if len(args) == 2:
+                rate_limit_sim(100000, base_tdist, 5)
+            
+            else:
+                if args[2] == '-d':
+                    epochs = value_parser(args[3], int)
+                    n_tx = value_parser(args[4], float)
+                    if epochs and n_tx:
+                        rate_limit_sim(epochs, base_tdist, n_tx)
+                        
+                else:
+                    epochs = value_parser(args[2], int)
+                    d1 = value_parser(args[3], float)
+                    d2 = value_parser(args[4], float)
+                    d3 = value_parser(args[5], float)
+                    n_tx = value_parser(args[6], float)
+                    
+                    if epochs and d1 and d2 and d3 and n_tx:
+                        rate_limit_sim(epochs, [d1,d2,d3,1.0], n_tx)
+        else:
+            print("ERROR: {} is an invalid simulation type. Please pass in either \'rate_sim\', \'net_sim\', or nothing as the second argument.".format(args[1]))

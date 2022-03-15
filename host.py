@@ -14,7 +14,7 @@ class Host():
             QJUMP_2,
             QJUMP_3
         ]
-        self.queues = [queue.Queue()] * 4
+        self.queue = queue.Queue()
         self.group = group
                             
                 
@@ -34,7 +34,7 @@ class Host():
         
         # Add packet to queues[priority], return SENT
         self.tokens[pkt.get_priority()] -= pkt.get_length()
-        self.queues[pkt.get_priority()].put(pkt)
+        self.queue.put(pkt)
         return 1
         
             
